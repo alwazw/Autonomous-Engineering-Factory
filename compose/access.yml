@@ -4,9 +4,7 @@ services:
     container_name: aef_manager
     ports: ["5001:5001"]
     networks: [ingress]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ../compose:/app/stacks
+    volumes: ['/var/run/docker.sock:/var/run/docker.sock', '../compose:/app/stacks']
     environment:
       - DOCKGE_STACKS_DIR=/app/stacks
 
@@ -19,10 +17,27 @@ services:
 
   guacamole:
     image: abcdesktopio/oc-guacamole:latest
-    container_name: aef_remote
+    container_name: aef_remote_web
+    ports: ["8080:8080"]
     environment:
       GUAC_ADMIN_PASSWORD: ${GUAC_ADMIN_PASSWORD}
     networks: [ingress, agent_bus]
+
+  rustdesk-server:
+    image: rustdesk/rustdesk-server:latest
+    container_name: aef_remote_control
+    ports: ['21115:21115', '21116:21116', '21116:21116/udp', '21117:21117']
+    networks: [ingress]
+    command: hbbs -r ${VM_IP}:21116 -k ${RUST_KEY}
+    volumes: [../data/rustdesk:/root]
+
+  rustdesk-relay:
+    image: rustdesk/rustdesk-server:latest
+    container_name: aef_remote_relay
+    ports: ['21118:21118', '21119:21119']
+    networks: [ingress]
+    command: hbbr
+    volumes: [../data/rustdesk:/root]
 
 networks:
   ingress:

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 🤖 AUTONOMOUS ENGINEERING FACTORY (AEF) - MASTER BOOTSTRAP (RECONCILED)
+# 🤖 AUTONOMOUS ENGINEERING FACTORY (AEF) - MASTER BOOTSTRAP (FINAL v2)
 # Architecture: Senior Lead / Reconciled Modular Stack / Zero-Trust
 # ==============================================================================
 set -e
@@ -11,25 +11,29 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${BLUE}🏗️ Initializing Reconciled AEF Modular Build...${NC}"
+echo -e "${BLUE}🏗️ Initializing Final AEF v2 Modular Build...${NC}"
 
 # 1. HOST HARDENING & DEPENDENCIES
 echo -e "${YELLOW}📦 Installing System Dependencies...${NC}"
 sudo -n apt update && sudo -n apt install -y \
     curl git openssl jq build-essential libmagic-dev \
-    python3-pip python3-venv docker.io docker-compose-v2 || echo -e "${YELLOW}⚠️ System update failed, continuing with existing dependencies...${NC}"
+    python3-pip python3-venv docker.io docker-compose-v2 || echo -e "${YELLOW}⚠️ System update failed, continuing...${NC}"
+
+# Install Python dependencies for the bridge
+pip3 install proxmoxer python-dotenv requests --break-system-packages || pip3 install proxmoxer python-dotenv requests || true
 
 if getent group docker > /dev/null; then
     sudo -n usermod -aG docker $USER || true
 fi
 
 # 2. DIRECTORY ARCHITECTURE
-echo -e "${YELLOW}📁 Creating Modular Workspace with Observability & Data Layers...${NC}"
-mkdir -p ~/factory/{compose,data/{postgres,n8n,chroma,guac,tailscale,kuma,redis,searxng,anythingllm,nginx,prometheus,grafana,dockge},knowledge_base,scripts,workspace}
+echo -e "${YELLOW}📁 Creating Modular Workspace...${NC}"
+mkdir -p ~/factory/{compose,scripts,workspace,knowledge_base}
+mkdir -p ~/factory/data/{postgres,n8n/imports,chroma,guac,tailscale,kuma,redis,searxng,anythingllm,nginx,prometheus,grafana,dockge,rustdesk}
 cd ~/factory
 
 # 3. GENERATE SECURE ENV TEMPLATES
-echo -e "${YELLOW}🔐 Generating Reconciled Security Templates...${NC}"
+echo -e "${YELLOW}🔐 Generating Security Templates...${NC}"
 VM_IP_VAL=$(hostname -I | awk '{print $1}')
 [ -z "$VM_IP_VAL" ] && VM_IP_VAL="127.0.0.1"
 
@@ -61,6 +65,7 @@ N8N_SECRET=GENERATE_SECRET_N8N
 POSTGRES_USER=aef_admin
 POSTGRES_PASSWORD=GENERATE_SECRET_POSTGRES
 REDIS_PASSWORD=GENERATE_SECRET_REDIS
+SEARXNG_SECRET=GENERATE_SECRET_SEARXNG
 EOF
 
 if [ ! -f .env ]; then
@@ -70,15 +75,94 @@ if [ ! -f .env ]; then
     sed -i "s/GENERATE_SECRET_N8N/$(openssl rand -hex 24)/" .env
     sed -i "s/GENERATE_SECRET_POSTGRES/$(openssl rand -hex 16)/" .env
     sed -i "s/GENERATE_SECRET_REDIS/$(openssl rand -hex 16)/" .env
-    echo -e "${GREEN}✅ .env file generated with unique secure random secrets and local IP.${NC}"
+    sed -i "s/GENERATE_SECRET_SEARXNG/$(openssl rand -hex 32)/" .env
+    echo -e "${GREEN}✅ .env file generated with unique secrets.${NC}"
 else
     echo -e "${YELLOW}⚠️ .env file already exists. Skipping overwrite.${NC}"
 fi
 
-# 4. WRITE MODULAR COMPOSE FILES
-echo -e "${YELLOW}📦 Writing Reconciled Stack Modules...${NC}"
+# 4. GENERATE CONFIGURATION FILES
+echo -e "${YELLOW}⚙️ Generating Service Configurations...${NC}"
 
-# Core: The Brain & Cache
+# Prometheus Config
+cat <<EOF > data/prometheus/prometheus.yml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+EOF
+
+# SearXNG Config
+cat <<EOF > data/searxng/settings.yml
+use_default_settings: true
+server:
+  secret_key: "$(openssl rand -hex 32)"
+search:
+  safe_search: 0
+EOF
+
+# n8n Agentic Workflow
+cat <<EOF > data/n8n/imports/prompt_architect.json
+{
+  "name": "AEF Agentic Prompt Re-Engineer",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message"] },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "messageValues": [
+            { "message": "={{ \$json.message.text }}", "role": "user" },
+            { "message": "You are the AEF Architect. Expand the user request into: 1. Tech Stack, 2. DB Schema, 3. Deployment Steps.", "role": "system" }
+          ]
+        }
+      },
+      "id": "litellm-gateway",
+      "name": "LiteLLM API",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://swe-agent:8000/api/build",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [ { "name": "spec", "value": "={{ \$json.output }}" } ]
+        }
+      },
+      "id": "trigger-swe",
+      "name": "Trigger SWE-Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [ [ { "node": "LiteLLM API", "type": "main", "index": 0 } ] ] },
+    "LiteLLM API": { "main": [ [ { "node": "Trigger SWE-Agent", "type": "main", "index": 0 } ] ] }
+  }
+}
+EOF
+
+# 5. WRITE MODULAR COMPOSE FILES
+echo -e "${YELLOW}📦 Writing Modular Stack...${NC}"
+
+# CORE.YML
 cat <<EOF > compose/core.yml
 services:
   postgres:
@@ -106,6 +190,7 @@ services:
   n8n:
     image: docker.n8n.io/n8nio/n8n
     container_name: aef_orchestrator
+    ports: ["5678:5678"]
     environment:
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
@@ -122,7 +207,7 @@ networks:
   data_tier:
 EOF
 
-# Agents & RAG
+# AGENTS.YML
 cat <<EOF > compose/agents.yml
 services:
   swe-agent:
@@ -136,7 +221,9 @@ services:
     image: searxng/searxng:latest
     container_name: aef_search
     networks: [agent_bus]
-    volumes: [../data/searxng:/etc/searxng]
+    volumes: [../data/searxng/settings.yml:/etc/searxng/settings.yml]
+    environment:
+      - SEARXNG_SECRET=\${SEARXNG_SECRET}
 
   chromadb:
     image: chromadb/chroma:latest
@@ -157,7 +244,7 @@ networks:
   data_tier:
 EOF
 
-# Network & Ingress
+# NETWORK.YML
 cat <<EOF > compose/network.yml
 services:
   nginx:
@@ -190,7 +277,7 @@ networks:
   agent_bus:
 EOF
 
-# Access & Management
+# ACCESS.YML
 cat <<EOF > compose/access.yml
 services:
   dockge:
@@ -198,9 +285,7 @@ services:
     container_name: aef_manager
     ports: ["5001:5001"]
     networks: [ingress]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ../compose:/app/stacks
+    volumes: ['/var/run/docker.sock:/var/run/docker.sock', '../compose:/app/stacks']
     environment:
       - DOCKGE_STACKS_DIR=/app/stacks
 
@@ -213,28 +298,46 @@ services:
 
   guacamole:
     image: abcdesktopio/oc-guacamole:latest
-    container_name: aef_remote
+    container_name: aef_remote_web
+    ports: ["8080:8080"]
     environment:
       GUAC_ADMIN_PASSWORD: \${GUAC_ADMIN_PASSWORD}
     networks: [ingress, agent_bus]
+
+  rustdesk-server:
+    image: rustdesk/rustdesk-server:latest
+    container_name: aef_remote_control
+    ports: ['21115:21115', '21116:21116', '21116:21116/udp', '21117:21117']
+    networks: [ingress]
+    command: hbbs -r \${VM_IP}:21116 -k \${RUST_KEY}
+    volumes: [../data/rustdesk:/root]
+
+  rustdesk-relay:
+    image: rustdesk/rustdesk-server:latest
+    container_name: aef_remote_relay
+    ports: ['21118:21118', '21119:21119']
+    networks: [ingress]
+    command: hbbr
+    volumes: [../data/rustdesk:/root]
 
 networks:
   ingress:
   agent_bus:
 EOF
 
-# Observability & Monitoring
+# OBSERVABILITY.YML
 cat <<EOF > compose/observability.yml
 services:
   prometheus:
     image: prom/prometheus:latest
     container_name: aef_telemetry
     networks: [monitoring]
-    volumes: [../data/prometheus:/etc/prometheus]
+    volumes: [../data/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml]
 
   grafana:
     image: grafana/grafana:latest
     container_name: aef_dashboard
+    ports: ["3000:3000"]
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=\${GRAFANA_PASSWORD}
     networks: [monitoring, ingress]
@@ -256,7 +359,7 @@ networks:
   ingress:
 EOF
 
-# Master Entry
+# MASTER ENTRY
 cat <<EOF > docker-compose.yml
 include:
   - compose/core.yml
@@ -272,7 +375,7 @@ networks:
   monitoring:
 EOF
 
-# 5. WRITE THE PROXMOX API BRIDGE
+# 6. WRITE PROXMOX API BRIDGE
 echo -e "${YELLOW}🐍 Setting up Proxmox Python Bridge...${NC}"
 cat <<EOF > scripts/proxmox_bridge.py
 import os
@@ -303,8 +406,8 @@ if __name__ == "__main__":
         print(f"❌ Connection Failed: {e}")
 EOF
 
-# 6. WRITE THE AGENT DEFINITIONS (AGENTS.md)
-echo -e "${YELLOW}🤖 Documenting Agentic Personas...${NC}"
+# 7. WRITE AGENTS.MD & README.MD
+echo -e "${YELLOW}📝 Generating Architectural Documentation...${NC}"
 cat <<EOF > AGENTS.md
 # 🤖 AEF Agent Registry
 ### *Defining the Roles, Responsibilities, and Logic Gates.*
@@ -341,17 +444,15 @@ The AEF operates on a **Distributed Intelligence** model. Each agent is a specia
 4. **Agent Zero:** "PR merged. Provisioning Proxmox LXC. Service is LIVE."
 EOF
 
-# 7. WRITE THE PROFESSIONAL README.MD
-echo -e "${YELLOW}📝 Generating Architectural Documentation...${NC}"
 cat <<EOF > README.md
-# 🤖 Autonomous Engineering Factory (AEF)
+# 🤖 Autonomous Engineering Factory (AEF) v2
 ### *Agentic Infrastructure. Self-Healing Code. Zero-Trust Security.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Stack: n8n](https://img.shields.io/badge/Orchestrator-n8n-red.svg)](https://n8n.io)
 [![Infrastructure: Proxmox](https://img.shields.io/badge/Infrastructure-Proxmox-orange.svg)](https://www.proxmox.com)
 
-The **AEF** is a modular, event-driven ecosystem that transforms high-level intent into production-ready software. It utilizes a swarm of AI agents to handle the entire SDLC—from prompt re-engineering to hardware-level provisioning.
+The **AEF v2** is a modular, event-driven ecosystem that transforms high-level intent into production-ready software. It utilizes a swarm of AI agents to handle the entire SDLC—from prompt re-engineering to hardware-level provisioning.
 
 ---
 
@@ -377,8 +478,7 @@ The **AEF** is a modular, event-driven ecosystem that transforms high-level inte
 ### 1. Bootstrap the Environment
 \`\`\`bash
 # Run this on a clean Proxmox VM (Ubuntu/Debian)
-# Replace <repo-owner> with your GitHub username
-curl -sSL https://raw.githubusercontent.com/<repo-owner>/Autonomous-Engineering-Factory/main/bootstrap.sh | bash
+curl -sSL https://raw.githubusercontent.com/<repo-owner>/Autonomous-Engineering-Factory/v2/bootstrap.sh | bash
 \`\`\`
 
 ### 2. Configure Secrets
@@ -400,5 +500,6 @@ docker compose up -d
 * **Knowledge Base UI (AnythingLLM):** \`http://[VM-IP]:3002\`
 EOF
 
-echo -e "${GREEN}🏁 RECONCILED AEF BUILD COMPLETE!${NC}"
+
+echo -e "${GREEN}🏁 AEF BUILD COMPLETE!${NC}"
 echo -e "Next Step: Edit ${BLUE}~/factory/.env${NC} then run ${BLUE}docker compose up -d${NC}"

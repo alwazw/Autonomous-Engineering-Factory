@@ -1,11 +1,11 @@
-# 🤖 Autonomous Engineering Factory (AEF)
+# 🤖 Autonomous Engineering Factory (AEF) v2
 ### *Agentic Infrastructure. Self-Healing Code. Zero-Trust Security.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Stack: n8n](https://img.shields.io/badge/Orchestrator-n8n-red.svg)](https://n8n.io)
 [![Infrastructure: Proxmox](https://img.shields.io/badge/Infrastructure-Proxmox-orange.svg)](https://www.proxmox.com)
 
-The **AEF** is a modular, event-driven ecosystem that transforms high-level intent into production-ready software. It utilizes a swarm of AI agents to handle the entire SDLC—from prompt re-engineering to hardware-level provisioning.
+The **AEF v2** is a modular, event-driven ecosystem that transforms high-level intent into production-ready software. It utilizes a swarm of AI agents to handle the entire SDLC—from prompt re-engineering to hardware-level provisioning.
 
 ---
 
@@ -31,8 +31,7 @@ The **AEF** is a modular, event-driven ecosystem that transforms high-level inte
 ### 1. Bootstrap the Environment
 ```bash
 # Run this on a clean Proxmox VM (Ubuntu/Debian)
-# Replace <repo-owner> with your GitHub username
-curl -sSL https://raw.githubusercontent.com/<repo-owner>/Autonomous-Engineering-Factory/main/bootstrap.sh | bash
+curl -sSL https://raw.githubusercontent.com/<repo-owner>/Autonomous-Engineering-Factory/v2/bootstrap.sh | bash
 ```
 
 ### 2. Configure Secrets
