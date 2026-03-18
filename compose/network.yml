@@ -1,4 +1,11 @@
 services:
+  nginx:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: aef_proxy
+    ports: ['80:80', '81:81', '443:443']
+    networks: [ingress]
+    volumes: [../data/nginx:/data, ../data/nginx/letsencrypt:/etc/letsencrypt]
+
   cf-tunnel:
     image: cloudflare/cloudflared:latest
     container_name: aef_tunnel
@@ -16,20 +23,6 @@ services:
     volumes: ['../data/tailscale:/var/lib/tailscale', '/dev/net/tun:/dev/net/tun']
     cap_add: [NET_ADMIN, SYS_MODULE]
     networks: [ingress, agent_bus]
-
-  guacamole:
-    image: abcdesktopio/oc-guacamole:latest
-    container_name: aef_remote
-    environment:
-      GUAC_ADMIN_PASSWORD: ${GUAC_ADMIN_PASSWORD}
-    networks: [ingress, agent_bus]
-
-  uptime-kuma:
-    image: louislam/uptime-kuma:1
-    container_name: aef_monitor
-    ports: ['3001:3001']
-    networks: [ingress]
-    volumes: [../data/kuma:/app/data]
 
 networks:
   ingress:

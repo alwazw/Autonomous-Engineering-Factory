@@ -8,6 +8,12 @@ services:
     networks: [data_tier]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"], interval: 5s }
 
+  redis:
+    image: redis:7-alpine
+    container_name: aef_cache
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    networks: [data_tier]
+
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: aef_brain

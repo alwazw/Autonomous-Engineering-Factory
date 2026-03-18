@@ -6,12 +6,26 @@ services:
     networks: [agent_bus, data_tier]
     volumes: ['/var/run/docker.sock:/var/run/docker.sock', '../workspace:/workspace']
 
+  searxng:
+    image: searxng/searxng:latest
+    container_name: aef_search
+    networks: [agent_bus]
+    volumes: [../data/searxng:/etc/searxng]
+
   chromadb:
     image: chromadb/chroma:latest
     container_name: aef_memory
     networks: [agent_bus]
     volumes: [../data/chroma:/chroma/data]
 
+  anythingllm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: aef_kb_ui
+    ports: ["3002:3001"]
+    networks: [ingress, agent_bus]
+    volumes: [../data/anythingllm:/app/storage]
+
 networks:
+  ingress:
   agent_bus:
   data_tier:

@@ -1,0 +1,29 @@
+services:
+  dockge:
+    image: louislam/dockge:1
+    container_name: aef_manager
+    ports: ["5001:5001"]
+    networks: [ingress]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../compose:/app/stacks
+    environment:
+      - DOCKGE_STACKS_DIR=/app/stacks
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: aef_monitor
+    ports: ['3001:3001']
+    networks: [ingress]
+    volumes: [../data/kuma:/app/data]
+
+  guacamole:
+    image: abcdesktopio/oc-guacamole:latest
+    container_name: aef_remote
+    environment:
+      GUAC_ADMIN_PASSWORD: ${GUAC_ADMIN_PASSWORD}
+    networks: [ingress, agent_bus]
+
+networks:
+  ingress:
+  agent_bus:

@@ -19,9 +19,9 @@ The **AEF** is a modular, event-driven ecosystem that transforms high-level inte
 ---
 
 ## 💎 Architectural Pillars
-* **Agentic RAG:** Persistent "Expert Memory" via ChromaDB.
-* **Self-Healing CI/CD:** Automated hardware/software recovery.
-* **Zero-Trust Access:** Port-less remote management via Cloudflare Tunnels.
+* **Agentic RAG:** Persistent "Expert Memory" via ChromaDB & AnythingLLM.
+* **Self-Healing CI/CD:** Automated hardware/software recovery with Prometheus/Grafana telemetry.
+* **Zero-Trust Access:** Port-less remote management via Cloudflare Tunnels & Tailscale.
 * **Unified LLM Gateway:** Hot-swappable model support via LiteLLM.
 
 ---
@@ -49,3 +49,6 @@ docker compose up -d
 * **Orchestrator (n8n):** `http://[VM-IP]:5678`
 * **Sentry Dashboard (Kuma):** `http://[VM-IP]:3001`
 * **Remote Management (Guacamole):** `http://[VM-IP]:8080`
+* **Telemetry (Grafana):** `http://[VM-IP]:3000`
+* **Stack Management (Dockge):** `http://[VM-IP]:5001`
+* **Knowledge Base UI (AnythingLLM):** `http://[VM-IP]:3002`
