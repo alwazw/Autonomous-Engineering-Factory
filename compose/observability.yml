@@ -1,0 +1,29 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aef_telemetry
+    networks: [monitoring]
+    volumes: [../data/prometheus:/etc/prometheus]
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aef_dashboard
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    networks: [monitoring, ingress]
+    volumes: [../data/grafana:/var/lib/grafana]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: aef_metrics
+    networks: [monitoring]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+networks:
+  monitoring:
+  ingress:

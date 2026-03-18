@@ -2,8 +2,11 @@ include:
   - compose/core.yml
   - compose/agents.yml
   - compose/network.yml
+  - compose/access.yml
+  - compose/observability.yml
 
 networks:
   ingress:
   agent_bus:
   data_tier:
+  monitoring:

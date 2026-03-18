@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
-# 🤖 AUTONOMOUS ENGINEERING FACTORY (AEF) - MASTER BOOTSTRAP
-# Architecture: Senior Lead / Modular Stack / Zero-Trust
+# 🤖 AUTONOMOUS ENGINEERING FACTORY (AEF) - MASTER BOOTSTRAP (RECONCILED)
+# Architecture: Senior Lead / Reconciled Modular Stack / Zero-Trust
 # ==============================================================================
 set -e
 
@@ -11,28 +11,33 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${BLUE}🏗️ Initializing AEF Modular Build...${NC}"
+echo -e "${BLUE}🏗️ Initializing Reconciled AEF Modular Build...${NC}"
 
 # 1. HOST HARDENING & DEPENDENCIES
 echo -e "${YELLOW}📦 Installing System Dependencies...${NC}"
-# Use sudo -n to avoid interactive prompts in the sandbox environment
 sudo -n apt update && sudo -n apt install -y \
     curl git openssl jq build-essential libmagic-dev \
     python3-pip python3-venv docker.io docker-compose-v2 || echo -e "${YELLOW}⚠️ System update failed, continuing with existing dependencies...${NC}"
 
-# Check if docker group exists and user is in it
 if getent group docker > /dev/null; then
     sudo -n usermod -aG docker $USER || true
 fi
 
 # 2. DIRECTORY ARCHITECTURE
-echo -e "${YELLOW}📁 Creating Modular Workspace...${NC}"
-mkdir -p ~/factory/{compose,data/{postgres,n8n,chroma,guac,tailscale,kuma},knowledge_base,scripts,workspace}
+echo -e "${YELLOW}📁 Creating Modular Workspace with Observability & Data Layers...${NC}"
+mkdir -p ~/factory/{compose,data/{postgres,n8n,chroma,guac,tailscale,kuma,redis,searxng,anythingllm,nginx,prometheus,grafana,dockge},knowledge_base,scripts,workspace}
 cd ~/factory
 
 # 3. GENERATE SECURE ENV TEMPLATES
-echo -e "${YELLOW}🔐 Generating Security Templates...${NC}"
+echo -e "${YELLOW}🔐 Generating Reconciled Security Templates...${NC}"
+VM_IP_VAL=$(hostname -I | awk '{print $1}')
+[ -z "$VM_IP_VAL" ] && VM_IP_VAL="127.0.0.1"
+
 cat <<EOF > .env.example
+# --- SYSTEM & NETWORK ---
+VM_IP=$VM_IP_VAL
+RUST_KEY=GENERATE_SECRET_RUST
+
 # --- AI & ORCHESTRATION ---
 OPENAI_API_KEY=sk-xxxx
 GITHUB_TOKEN=ghp_xxxx
@@ -49,29 +54,31 @@ PVE_TOKEN_VALUE=xxxx-xxxx-xxxx
 CLOUDFLARE_TUNNEL_TOKEN=ey...
 TAILSCALE_AUTHKEY=tskey-auth-...
 GUAC_ADMIN_PASSWORD=AdminPassword123!
-RUST_KEY=\$(openssl rand -hex 16)
+GRAFANA_PASSWORD=GrafanaAdmin123!
 
 # --- AUTO-GENERATED SECRETS ---
-N8N_SECRET=\$(openssl rand -hex 24)
+N8N_SECRET=GENERATE_SECRET_N8N
 POSTGRES_USER=aef_admin
-POSTGRES_PASSWORD=\$(openssl rand -hex 16)
+POSTGRES_PASSWORD=GENERATE_SECRET_POSTGRES
+REDIS_PASSWORD=GENERATE_SECRET_REDIS
 EOF
 
-# Only copy to .env if it doesn't exist or we want to overwrite it with new secrets
 if [ ! -f .env ]; then
     cp .env.example .env
-    # Perform substitutions for secrets in .env
-    sed -i "s/\$(openssl rand -hex 16)/$(openssl rand -hex 16)/g" .env
-    sed -i "s/\$(openssl rand -hex 24)/$(openssl rand -hex 24)/g" .env
-    echo -e "${GREEN}✅ .env file generated with secure random secrets.${NC}"
+    # Perform substitutions with unique secrets
+    sed -i "s/GENERATE_SECRET_RUST/$(openssl rand -hex 16)/" .env
+    sed -i "s/GENERATE_SECRET_N8N/$(openssl rand -hex 24)/" .env
+    sed -i "s/GENERATE_SECRET_POSTGRES/$(openssl rand -hex 16)/" .env
+    sed -i "s/GENERATE_SECRET_REDIS/$(openssl rand -hex 16)/" .env
+    echo -e "${GREEN}✅ .env file generated with unique secure random secrets and local IP.${NC}"
 else
     echo -e "${YELLOW}⚠️ .env file already exists. Skipping overwrite.${NC}"
 fi
 
 # 4. WRITE MODULAR COMPOSE FILES
-echo -e "${YELLOW}📦 Writing Stack Modules...${NC}"
+echo -e "${YELLOW}📦 Writing Reconciled Stack Modules...${NC}"
 
-# Core: The Brain
+# Core: The Brain & Cache
 cat <<EOF > compose/core.yml
 services:
   postgres:
@@ -82,6 +89,12 @@ services:
       POSTGRES_PASSWORD: \${POSTGRES_PASSWORD}
     networks: [data_tier]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U \${POSTGRES_USER}"], interval: 5s }
+
+  redis:
+    image: redis:7-alpine
+    container_name: aef_cache
+    command: redis-server --requirepass \${REDIS_PASSWORD}
+    networks: [data_tier]
 
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
@@ -119,20 +132,41 @@ services:
     networks: [agent_bus, data_tier]
     volumes: ['/var/run/docker.sock:/var/run/docker.sock', '../workspace:/workspace']
 
+  searxng:
+    image: searxng/searxng:latest
+    container_name: aef_search
+    networks: [agent_bus]
+    volumes: [../data/searxng:/etc/searxng]
+
   chromadb:
     image: chromadb/chroma:latest
     container_name: aef_memory
     networks: [agent_bus]
     volumes: [../data/chroma:/chroma/data]
 
+  anythingllm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: aef_kb_ui
+    ports: ["3002:3001"]
+    networks: [ingress, agent_bus]
+    volumes: [../data/anythingllm:/app/storage]
+
 networks:
+  ingress:
   agent_bus:
   data_tier:
 EOF
 
-# Network & Access (Cloudflare, Tailscale, Guac, Kuma)
+# Network & Ingress
 cat <<EOF > compose/network.yml
 services:
+  nginx:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: aef_proxy
+    ports: ['80:80', '81:81', '443:443']
+    networks: [ingress]
+    volumes: [../data/nginx:/data, ../data/nginx/letsencrypt:/etc/letsencrypt]
+
   cf-tunnel:
     image: cloudflare/cloudflared:latest
     container_name: aef_tunnel
@@ -151,12 +185,24 @@ services:
     cap_add: [NET_ADMIN, SYS_MODULE]
     networks: [ingress, agent_bus]
 
-  guacamole:
-    image: abcdesktopio/oc-guacamole:latest
-    container_name: aef_remote
+networks:
+  ingress:
+  agent_bus:
+EOF
+
+# Access & Management
+cat <<EOF > compose/access.yml
+services:
+  dockge:
+    image: louislam/dockge:1
+    container_name: aef_manager
+    ports: ["5001:5001"]
+    networks: [ingress]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../compose:/app/stacks
     environment:
-      GUAC_ADMIN_PASSWORD: \${GUAC_ADMIN_PASSWORD}
-    networks: [ingress, agent_bus]
+      - DOCKGE_STACKS_DIR=/app/stacks
 
   uptime-kuma:
     image: louislam/uptime-kuma:1
@@ -165,9 +211,49 @@ services:
     networks: [ingress]
     volumes: [../data/kuma:/app/data]
 
+  guacamole:
+    image: abcdesktopio/oc-guacamole:latest
+    container_name: aef_remote
+    environment:
+      GUAC_ADMIN_PASSWORD: \${GUAC_ADMIN_PASSWORD}
+    networks: [ingress, agent_bus]
+
 networks:
   ingress:
   agent_bus:
+EOF
+
+# Observability & Monitoring
+cat <<EOF > compose/observability.yml
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aef_telemetry
+    networks: [monitoring]
+    volumes: [../data/prometheus:/etc/prometheus]
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aef_dashboard
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=\${GRAFANA_PASSWORD}
+    networks: [monitoring, ingress]
+    volumes: [../data/grafana:/var/lib/grafana]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: aef_metrics
+    networks: [monitoring]
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+networks:
+  monitoring:
+  ingress:
 EOF
 
 # Master Entry
@@ -176,11 +262,14 @@ include:
   - compose/core.yml
   - compose/agents.yml
   - compose/network.yml
+  - compose/access.yml
+  - compose/observability.yml
 
 networks:
   ingress:
   agent_bus:
   data_tier:
+  monitoring:
 EOF
 
 # 5. WRITE THE PROXMOX API BRIDGE
@@ -276,9 +365,9 @@ The **AEF** is a modular, event-driven ecosystem that transforms high-level inte
 ---
 
 ## 💎 Architectural Pillars
-* **Agentic RAG:** Persistent "Expert Memory" via ChromaDB.
-* **Self-Healing CI/CD:** Automated hardware/software recovery.
-* **Zero-Trust Access:** Port-less remote management via Cloudflare Tunnels.
+* **Agentic RAG:** Persistent "Expert Memory" via ChromaDB & AnythingLLM.
+* **Self-Healing CI/CD:** Automated hardware/software recovery with Prometheus/Grafana telemetry.
+* **Zero-Trust Access:** Port-less remote management via Cloudflare Tunnels & Tailscale.
 * **Unified LLM Gateway:** Hot-swappable model support via LiteLLM.
 
 ---
@@ -288,7 +377,8 @@ The **AEF** is a modular, event-driven ecosystem that transforms high-level inte
 ### 1. Bootstrap the Environment
 \`\`\`bash
 # Run this on a clean Proxmox VM (Ubuntu/Debian)
-curl -sSL https://raw.githubusercontent.com/your-username/aef/main/bootstrap.sh | bash
+# Replace <repo-owner> with your GitHub username
+curl -sSL https://raw.githubusercontent.com/<repo-owner>/Autonomous-Engineering-Factory/main/bootstrap.sh | bash
 \`\`\`
 
 ### 2. Configure Secrets
@@ -305,7 +395,10 @@ docker compose up -d
 * **Orchestrator (n8n):** \`http://[VM-IP]:5678\`
 * **Sentry Dashboard (Kuma):** \`http://[VM-IP]:3001\`
 * **Remote Management (Guacamole):** \`http://[VM-IP]:8080\`
+* **Telemetry (Grafana):** \`http://[VM-IP]:3000\`
+* **Stack Management (Dockge):** \`http://[VM-IP]:5001\`
+* **Knowledge Base UI (AnythingLLM):** \`http://[VM-IP]:3002\`
 EOF
 
-echo -e "${GREEN}🏁 AEF BUILD COMPLETE!${NC}"
+echo -e "${GREEN}🏁 RECONCILED AEF BUILD COMPLETE!${NC}"
 echo -e "Next Step: Edit ${BLUE}~/factory/.env${NC} then run ${BLUE}docker compose up -d${NC}"
