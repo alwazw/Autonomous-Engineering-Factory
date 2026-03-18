@@ -1,0 +1,36 @@
+services:
+  cf-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: aef_tunnel
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks: [ingress]
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: aef_mesh
+    environment:
+      TS_AUTHKEY: ${TAILSCALE_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+    volumes: ['../data/tailscale:/var/lib/tailscale', '/dev/net/tun:/dev/net/tun']
+    cap_add: [NET_ADMIN, SYS_MODULE]
+    networks: [ingress, agent_bus]
+
+  guacamole:
+    image: abcdesktopio/oc-guacamole:latest
+    container_name: aef_remote
+    environment:
+      GUAC_ADMIN_PASSWORD: ${GUAC_ADMIN_PASSWORD}
+    networks: [ingress, agent_bus]
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: aef_monitor
+    ports: ['3001:3001']
+    networks: [ingress]
+    volumes: [../data/kuma:/app/data]
+
+networks:
+  ingress:
+  agent_bus:

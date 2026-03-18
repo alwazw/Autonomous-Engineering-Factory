@@ -1,0 +1,9 @@
+include:
+  - compose/core.yml
+  - compose/agents.yml
+  - compose/network.yml
+
+networks:
+  ingress:
+  agent_bus:
+  data_tier:

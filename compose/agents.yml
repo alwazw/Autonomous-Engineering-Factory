@@ -1,0 +1,17 @@
+services:
+  swe-agent:
+    image: sweagent/swe-agent:latest
+    container_name: aef_coder
+    env_file: ../.env
+    networks: [agent_bus, data_tier]
+    volumes: ['/var/run/docker.sock:/var/run/docker.sock', '../workspace:/workspace']
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: aef_memory
+    networks: [agent_bus]
+    volumes: [../data/chroma:/chroma/data]
+
+networks:
+  agent_bus:
+  data_tier:
