@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aef_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    networks: [data_tier]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"], interval: 5s }
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: aef_brain
+    env_file: ../.env
+    ports: ["4000:4000"]
+    networks: [agent_bus]
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: aef_orchestrator
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_SECRET}
+    networks: [ingress, agent_bus, data_tier]
+    volumes: [../data/n8n:/home/node/.n8n]
+    depends_on: { postgres: { condition: service_healthy } }
+
+networks:
+  ingress:
+  agent_bus:
+  data_tier:
