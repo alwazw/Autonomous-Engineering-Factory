@@ -1,0 +1,48 @@
+{
+  "name": "AEF Agentic Prompt Re-Engineer",
+  "nodes": [
+    {
+      "parameters": { "updates": ["message"] },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "messages": {
+          "messageValues": [
+            { "message": "={{ $json.message.text }}", "role": "user" },
+            { "message": "You are the AEF Architect. Expand the user request into: 1. Tech Stack, 2. DB Schema, 3. Deployment Steps.", "role": "system" }
+          ]
+        }
+      },
+      "id": "litellm-gateway",
+      "name": "LiteLLM API",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://swe-agent:8000/api/build",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [ { "name": "spec", "value": "={{ $json.output }}" } ]
+        }
+      },
+      "id": "trigger-swe",
+      "name": "Trigger SWE-Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [ [ { "node": "LiteLLM API", "type": "main", "index": 0 } ] ] },
+    "LiteLLM API": { "main": [ [ { "node": "Trigger SWE-Agent", "type": "main", "index": 0 } ] ] }
+  }
+}

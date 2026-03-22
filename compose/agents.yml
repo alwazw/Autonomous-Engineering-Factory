@@ -10,7 +10,9 @@ services:
     image: searxng/searxng:latest
     container_name: aef_search
     networks: [agent_bus]
-    volumes: [../data/searxng:/etc/searxng]
+    volumes: [../data/searxng/settings.yml:/etc/searxng/settings.yml]
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET}
 
   chromadb:
     image: chromadb/chroma:latest

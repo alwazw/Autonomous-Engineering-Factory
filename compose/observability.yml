@@ -3,11 +3,12 @@ services:
     image: prom/prometheus:latest
     container_name: aef_telemetry
     networks: [monitoring]
-    volumes: [../data/prometheus:/etc/prometheus]
+    volumes: [../data/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml]
 
   grafana:
     image: grafana/grafana:latest
     container_name: aef_dashboard
+    ports: ["3000:3000"]
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
     networks: [monitoring, ingress]
