@@ -511,5 +511,8 @@ EOF
 
 
 echo -e "${GREEN}🏁 AEF BUILD COMPLETE!${NC}"
-echo -e "Next Step: Edit ${BLUE}~/factory/.env${NC} then run ${BLUE}docker compose up -d${NC}"
+echo -e "Next Step:  
+#then run
 cd factory
+nano ${BLUE}~/factory/.env${NC}
+${BLUE}docker compose up -d${NC}"
