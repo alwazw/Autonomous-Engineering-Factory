@@ -31,7 +31,8 @@ The **AEF v2** is a modular, event-driven ecosystem that transforms high-level i
 ### 1. Bootstrap the Environment
 ```bash
 # Run this on a clean Proxmox VM (Ubuntu/Debian)
-curl -sSL https://raw.githubusercontent.com/alwazw/Autonomous-Engineering-Factory/v2/bootstrap.sh | bash
+curl -sSL https://github.com/alwazw/Autonomous-Engineering-Factory/blob/main/bootstrap.sh | bash
+#https://raw.githubusercontent.com/alwazw/Autonomous-Engineering-Factory/v2/bootstrap.sh | bash
 ```
 
 ### 2. Configure Secrets
