@@ -516,3 +516,5 @@ echo -e "Next Step:
 cd factory
 nano ${BLUE}~/factory/.env${NC}
 ${BLUE}docker compose up -d${NC}"
+
+chown -R 1000:1000 factory/data/n8n
