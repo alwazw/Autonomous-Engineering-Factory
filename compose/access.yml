@@ -16,7 +16,7 @@ services:
     volumes: [../data/kuma:/app/data]
 
   guacamole:
-    image: abcdesktopio/oc-guacamole:latest
+    image: guacamole/guacamole:latest
     container_name: aef_remote_web
     ports: ["8080:8080"]
     environment:
