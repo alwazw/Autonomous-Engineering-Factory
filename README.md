@@ -51,3 +51,4 @@ docker compose up -d
 * **Telemetry (Grafana):** `http://[VM-IP]:3000`
 * **Stack Management (Dockge):** `http://[VM-IP]:5001`
 * **Knowledge Base UI (AnythingLLM):** `http://[VM-IP]:3002`
+* **Database Manager (DbGate):** `http://[VM-IP]:3003`

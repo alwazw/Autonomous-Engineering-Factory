@@ -39,6 +39,14 @@ services:
     command: hbbr
     volumes: [../data/rustdesk:/root]
 
+  dbgate:
+    image: dbgate/dbgate:latest
+    container_name: aef_db_admin
+    ports: ["3003:3000"]
+    networks: [ingress, data_tier]
+    volumes: [../data/dbgate:/home/dbgate-data]
+
 networks:
   ingress:
   agent_bus:
+  data_tier:

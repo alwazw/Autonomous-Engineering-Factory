@@ -29,7 +29,7 @@ fi
 # 2. DIRECTORY ARCHITECTURE
 echo -e "${YELLOW}📁 Creating Modular Workspace...${NC}"
 mkdir -p ~/factory/{compose,scripts,workspace,knowledge_base}
-mkdir -p ~/factory/data/{postgres,n8n/imports,chroma,guac,tailscale,kuma,redis,searxng,anythingllm,nginx,prometheus,grafana,dockge,rustdesk}
+mkdir -p ~/factory/data/{postgres,n8n/imports,chroma,guac,tailscale,kuma,redis,searxng,anythingllm,nginx,prometheus,grafana,dockge,rustdesk,dbgate}
 cd ~/factory
 
 # 3. GENERATE SECURE ENV TEMPLATES
@@ -320,9 +320,17 @@ services:
     command: hbbr
     volumes: [../data/rustdesk:/root]
 
+  dbgate:
+    image: dbgate/dbgate:latest
+    container_name: aef_db_admin
+    ports: ["3003:3000"]
+    networks: [ingress, data_tier]
+    volumes: [../data/dbgate:/home/dbgate-data]
+
 networks:
   ingress:
   agent_bus:
+  data_tier:
 EOF
 
 # OBSERVABILITY.YML
@@ -498,6 +506,7 @@ docker compose up -d
 * **Telemetry (Grafana):** \`http://[VM-IP]:3000\`
 * **Stack Management (Dockge):** \`http://[VM-IP]:5001\`
 * **Knowledge Base UI (AnythingLLM):** \`http://[VM-IP]:3002\`
+* **Database Manager (DbGate):** \`http://[VM-IP]:3003\`
 EOF
 
 
