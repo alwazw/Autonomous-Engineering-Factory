@@ -37,6 +37,11 @@ curl -sSL https://raw.githubusercontent.com/alwazw/Autonomous-Engineering-Factor
 ### 2. Configure Secrets
 Edit the `.env` file in the root directory and the Proxmox credentials in `scripts/proxmox_bridge.py`.
 
+```bash
+cd factory
+nano scripts/proxmox_bridge.py
+```
+
 ### 3. Launch the Factory
 ```bash
 docker compose up -d
